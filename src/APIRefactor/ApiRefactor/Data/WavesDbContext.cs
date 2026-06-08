@@ -1,8 +1,9 @@
 using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 
 namespace ApiRefactor.Data;
 
-public class WavesDbContext
+public class WavesDbContext : DbContext
 {
     private const string ConnectionString = "Data Source=App_Data/waves.db";
 
