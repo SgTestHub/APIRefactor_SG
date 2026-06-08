@@ -1,6 +1,6 @@
 using ApiRefactor.Data;
 using ApiRefactor.Data.Repositories;
-using ApiRefactor.Models;
+using ApiRefactor.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,24 +20,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.MapGet("/api/wave", (IWaveRepository repository) => repository.GetAll())
-    .WithName("GetWaves")
-    .WithOpenApi();
-
-app.MapGet("/api/wave/{id}", (Guid id, IWaveRepository repository) => 
-    {
-        var wave = repository.GetById(id);
-        return wave is not null ? Results.Ok(wave) : Results.NotFound();
-    })
-    .WithName("GetWaveById")
-    .WithOpenApi();
-
-app.MapPost("/api/wave", (Wave wave, IWaveRepository repository) => 
-    {
-        repository.Save(wave);
-        return Results.Ok(wave);
-    })
-    .WithName("UpsertWave")
-    .WithOpenApi();
+// Map endpoints
+app.MapWavesEndpoints();
 
 app.Run();
