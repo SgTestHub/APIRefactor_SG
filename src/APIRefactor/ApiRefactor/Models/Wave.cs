@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace ApiRefactor.Models;
 
 /// <summary>
@@ -6,6 +8,7 @@ namespace ApiRefactor.Models;
 /// </summary>
 public class Wave
 {
+    [Key]
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = string.Empty;
     public DateTime WaveDate { get; set; } = DateTime.Now;

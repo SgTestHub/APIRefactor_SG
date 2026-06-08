@@ -1,6 +1,7 @@
 using ApiRefactor.Data.Repositories;
 using ApiRefactor.Models;
 using System.Net;
+using Microsoft.AspNetCore.Authorization;
 
 namespace ApiRefactor.Endpoints;
 
@@ -9,7 +10,8 @@ public static class WavesEndpoints
     public static void MapWavesEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/wave")
-            .WithTags("Waves");
+            .WithTags("Waves")
+            .RequireAuthorization();
 
         group.MapGet("/", GetAllWaves)
             .WithName("GetWaves")
