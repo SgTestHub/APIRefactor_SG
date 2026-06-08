@@ -7,20 +7,22 @@ public interface IWaveRepository
     /// <summary>
     /// Gets all waves from the database.
     /// </summary>
-    List<Wave> GetAll();
+    Task<List<Wave>> GetAll();
 
     /// <summary>
     /// Gets a wave by its ID.
     /// </summary>
-    Wave? GetById(Guid id);
+    Task<Wave?> GetById(Guid id);
 
     /// <summary>
     /// Saves a wave (insert or update).
     /// </summary>
-    void Save(Wave wave);
+    Task Save(Wave wave);
 
     /// <summary>
     /// Deletes a wave by its ID.
     /// </summary>
-    void Delete(Guid id);
+    Task Delete(Guid id);
+
+    Task<bool> WaveExists(Guid id);
 }

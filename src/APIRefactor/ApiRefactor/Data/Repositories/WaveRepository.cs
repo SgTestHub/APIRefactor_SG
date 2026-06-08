@@ -6,14 +6,17 @@ namespace ApiRefactor.Data.Repositories;
 public class WaveRepository : IWaveRepository
 {
     private readonly WavesDbContext _dbContext;
+    private readonly ILogger _logger;
 
-    public WaveRepository(WavesDbContext dbContext)
+    public WaveRepository(WavesDbContext dbContext, ILogger<WaveRepository> logger)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public List<Wave> GetAll()
+    public async Task<List<Wave>> GetAll()
     {
+        _logger.LogInformation("Getting all waves");
         var waves = new List<Wave>();
         using (var connection = _dbContext.GetConnection())
         {
@@ -23,12 +26,12 @@ public class WaveRepository : IWaveRepository
             {
                 command.CommandText = "SELECT id FROM waves";
 
-                using (var reader = command.ExecuteReader())
+                using (var reader = await command.ExecuteReaderAsync())
                 {
-                    while (reader.Read())
+                    while (await reader.ReadAsync())
                     {
                         var id = Guid.Parse(reader["id"].ToString() ?? string.Empty);
-                        var wave = GetById(id);
+                        var wave = await GetById(id);
                         if (wave != null)
                         {
                             waves.Add(wave);
@@ -37,12 +40,20 @@ public class WaveRepository : IWaveRepository
                 }
             }
         }
-
+        _logger.LogInformation("Retrieved {Count} waves", waves.Count);
         return waves;
     }
 
-    public Wave? GetById(Guid id)
+    public async Task<Wave?> GetById(Guid id)
     {
+        _logger.LogInformation("Getting WAVE with id {Id}", id);
+
+        if (!await WaveExists(id))
+        {
+            _logger.LogWarning("Wave with id {Id} not found", id);
+            return null;
+        }
+
         using (var connection = _dbContext.GetConnection())
         {
             _dbContext.EnsureConnectionOpen(connection);
@@ -52,9 +63,9 @@ public class WaveRepository : IWaveRepository
                 command.CommandText = "SELECT id, name, wavedate FROM waves WHERE id = @id";
                 command.Parameters.AddWithValue("@id", id.ToString());
 
-                using (var reader = command.ExecuteReader())
+                using (var reader = await command.ExecuteReaderAsync())
                 {
-                    if (reader.Read())
+                    if (await reader.ReadAsync())
                     {
                         var wave = new Wave
                         {
@@ -62,7 +73,7 @@ public class WaveRepository : IWaveRepository
                             Name = reader["name"].ToString() ?? string.Empty,
                             WaveDate = DateTime.Parse(reader["wavedate"].ToString() ?? DateTime.Now.ToString())
                         };
-
+                        _logger.LogInformation("Successfully retrieved wave {Id}", id);
                         return wave;
                     }
                 }
@@ -72,23 +83,26 @@ public class WaveRepository : IWaveRepository
         return null;
     }
 
-    public void Save(Wave wave)
+    public async Task Save(Wave wave)
     {
         if (wave == null)
             throw new ArgumentNullException(nameof(wave));
+
+        _logger.LogInformation("Saving wave {Id} with name {Name}", wave.Id, wave.Name);
 
         using (var connection = _dbContext.GetConnection())
         {
             _dbContext.EnsureConnectionOpen(connection);
 
             // Check if wave exists
-            var existingWave = GetById(wave.Id);
+            var existingWave = await WaveExists(wave.Id);
 
             using (var command = connection.CreateCommand())
             {
-                if (existingWave == null)
+                if (!existingWave)
                 {
                     // Insert
+                    _logger.LogInformation("Inserting new wave {Id}", wave.Id);
                     command.CommandText = @"INSERT INTO waves (id, name, wavedate) 
                                            VALUES (@id, @name, @wavedate)";
                     command.Parameters.AddWithValue("@id", wave.Id.ToString());
@@ -98,6 +112,7 @@ public class WaveRepository : IWaveRepository
                 else
                 {
                     // Update
+                    _logger.LogInformation("Updating existing wave {Id}", wave.Id);
                     command.CommandText = @"UPDATE waves 
                                            SET name = @name, wavedate = @wavedate 
                                            WHERE id = @id";
@@ -106,13 +121,15 @@ public class WaveRepository : IWaveRepository
                     command.Parameters.AddWithValue("@wavedate", wave.WaveDate);
                 }
 
-                command.ExecuteNonQuery();
+                await command.ExecuteNonQueryAsync();
+                _logger.LogInformation("Wave {Id} saved successfully", wave.Id);
             }
         }
     }
 
-    public void Delete(Guid id)
+    public async Task Delete(Guid id)
     {
+       
         using (var connection = _dbContext.GetConnection())
         {
             _dbContext.EnsureConnectionOpen(connection);
@@ -121,8 +138,29 @@ public class WaveRepository : IWaveRepository
             {
                 command.CommandText = "DELETE FROM waves WHERE id = @id";
                 command.Parameters.AddWithValue("@id", id.ToString());
-                command.ExecuteNonQuery();
+                await command.ExecuteNonQueryAsync();
+                _logger.LogInformation("Wave {Id} deleted successfully", id);
             }
         }
     }
+
+    public async Task<bool> WaveExists(Guid id)
+    {
+        using (var connection = _dbContext.GetConnection())
+        {
+            _dbContext.EnsureConnectionOpen(connection);
+
+            using (var command = connection.CreateCommand())
+            {
+                command.CommandText = "SELECT 1 FROM waves WHERE id = @id LIMIT 1";
+                command.Parameters.AddWithValue("@id", id.ToString());
+
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    return await reader.ReadAsync();
+                }
+            }
+        }
+    }
+
 }

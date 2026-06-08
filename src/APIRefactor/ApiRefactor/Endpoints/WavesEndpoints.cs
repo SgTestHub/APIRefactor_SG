@@ -1,5 +1,6 @@
 using ApiRefactor.Data.Repositories;
 using ApiRefactor.Models;
+using System.Net;
 
 namespace ApiRefactor.Endpoints;
 
@@ -13,35 +14,62 @@ public static class WavesEndpoints
         group.MapGet("/", GetAllWaves)
             .WithName("GetWaves")
             .WithOpenApi()
-            .Produces<List<Wave>>(StatusCodes.Status200OK);
+            .Produces<APIResponse>(StatusCodes.Status200OK);
 
         group.MapGet("/{id}", GetWaveById)
             .WithName("GetWaveById")
             .WithOpenApi()
-            .Produces<Wave>(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status404NotFound);
+            .Produces<APIResponse>(StatusCodes.Status200OK)
+            .Produces<APIResponse>(StatusCodes.Status404NotFound);
 
         group.MapPost("/", UpsertWave)
             .WithName("UpsertWave")
             .WithOpenApi()
-            .Produces<Wave>(StatusCodes.Status200OK)
+            .Produces<APIResponse>(StatusCodes.Status201Created)
             .Accepts<Wave>("application/json");
     }
 
-    private static List<Wave> GetAllWaves(IWaveRepository repository)
+    private static async Task<IResult> GetAllWaves(IWaveRepository repository,ILogger<Program> logger)
     {
-        return repository.GetAll();
+        var waves = await repository.GetAll();
+        return Results.Ok(new APIResponse
+        {
+            IsSuccess = true,
+            Result = waves,
+            StatusCode = HttpStatusCode.OK
+        });
     }
 
-    private static IResult GetWaveById(Guid id, IWaveRepository repository)
+    private static async Task<IResult> GetWaveById(Guid id, IWaveRepository repository, ILogger<Program> logger)
     {
-        var wave = repository.GetById(id);
-        return wave is not null ? Results.Ok(wave) : Results.NotFound();
+        if(!await repository.WaveExists(id))
+        {
+            logger.LogWarning("Wave with id {Id} not found", id);
+            return Results.NotFound(new APIResponse
+            {
+                IsSuccess = false,
+                ErrorMessages = new List<string> { $"Wave with id {id} not found" },
+                StatusCode = HttpStatusCode.NotFound
+            });
+        }
+        var wave = await repository.GetById(id);
+        return Results.Ok(new APIResponse
+        {
+            IsSuccess = true,
+            Result = wave,
+            StatusCode = HttpStatusCode.OK
+        });
     }
 
-    private static IResult UpsertWave(Wave wave, IWaveRepository repository)
+    private static async Task<IResult> UpsertWave(Wave wave, IWaveRepository repository, ILogger<Program> logger)
     {
-        repository.Save(wave);
-        return Results.Ok(wave);
+        await repository.Save(wave);
+        return Results.CreatedAtRoute("GetWaveById", new { id = wave.Id },
+                new APIResponse
+                {
+                    IsSuccess = true,
+                    Result = wave,
+                    StatusCode = HttpStatusCode.Created
+                });
     }
 }

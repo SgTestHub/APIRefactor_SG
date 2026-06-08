@@ -1,6 +1,6 @@
 using Microsoft.Data.Sqlite;
 
-namespace ApiRefactor.Models;
+namespace ApiRefactor.Data;
 
 public class SqlConnection
 {
